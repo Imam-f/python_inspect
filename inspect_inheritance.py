@@ -104,3 +104,36 @@ class C(B):
         pass
 
 get_class_details(C)
+
+"""
+Inheritance tree and details for C:
+
+=> C:
+  Methods:
+    method_a
+    method_b
+    method_c
+  Class Variables:
+    class_var_C
+  Variables assigned in __init__:
+    instance_var_C
+
+  => B:
+    Methods:
+      method_a
+      method_b
+    Class Variables:
+      class_var_B
+    Variables assigned in __init__:
+      instance_var_B
+
+    => A:
+      Methods:
+        method_a
+      Class Variables:
+        class_var_A
+      Variables assigned in __init__:
+        instance_var_A
+
+      => object:
+"""

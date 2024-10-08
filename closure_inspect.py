@@ -2,11 +2,10 @@ def add_n_generator(n):
     returns = []
     for i in range(n):
         whatnot = dict({"what": i})
-        # returns.append(lambda x, i=i: i + x)
         # def lambda_func(x):
-        #     return lambda k: k + x
+        #     return lambda y: y + x['what']
+        # returns.append(lambda_func(whatnot))
         returns.append((lambda x: lambda y: y + x['what'])(whatnot))
-        # returns.append(lambda x: x + whatnot['what'])
     return returns
 
 tests = add_n_generator(3)
@@ -21,3 +20,13 @@ for i in range(3):
           tests[i].__closure__,
           tests[i].__closure__[0].cell_contents['what'])
     print(tests[i](10))
+
+"""
+('n', 'returns', 'i', 'whatnot') () () None
+('y',) ('x',) () (<cell at 0x000001D7653E3640: dict object at 0x000001D765438040>,) 0
+10
+('y',) ('x',) () (<cell at 0x000001D7653E1D80: dict object at 0x000001D7654381C0>,) 1
+11
+('y',) ('x',) () (<cell at 0x000001D7653E2E00: dict object at 0x000001D765438200>,) 2
+12
+"""

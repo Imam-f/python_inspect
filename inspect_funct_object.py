@@ -53,3 +53,32 @@ def outer(x):
 # Get the closure
 closure_func = outer(5)
 inspect_function(closure_func)
+
+"""
+Function Name: inner
+Qualified Name: outer.<locals>.inner
+
+Docstring:
+  No docstring available.
+
+Code Object:
+  Argument Count: 1
+  Positional Arguments: ('z',)
+  Keyword-only Arguments Count: 0
+  Local Variables: ('z',)
+  Constants: (None,)
+  Free Variables: ('x', 'y')
+
+Defaults:
+  Positional Defaults: None
+  Keyword-only Defaults: None
+
+Annotations:
+  No annotations.
+
+Closure:
+  Free variable 0: 5
+  Free variable 1: 10
+Globals:
+  Accessible globals count: 12
+"""

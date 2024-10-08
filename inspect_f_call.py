@@ -107,3 +107,11 @@ if __name__ == "__main__":
 
     for func, calls in builder.call_graph.items():
         print(f"Function '{func}' calls functions: {sorted(calls)}")
+
+"""
+Function '<module>' calls functions: ['foo']
+Function 'MyClass.method1' calls functions: ['helper_function']
+Function 'MyClass.method2' calls functions: []
+Function 'helper_function' calls functions: []
+Function 'foo' calls functions: ['MyClass', 'MyClass.method1']
+"""
