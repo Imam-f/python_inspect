@@ -58,7 +58,10 @@ def inspect_object(obj):
     special_attrs = [attr for attr in dir(obj) if attr.startswith("__") and attr.endswith("__")]
     if special_attrs:
         for attr in special_attrs:
-            print(f"  {attr}")
+            if callable(getattr(obj, attr)):
+                print(f"  c||{attr}")
+            else:
+                print(f"  p||{attr}")
     else:
         print("  No special methods or properties.")
     print()
@@ -97,38 +100,38 @@ Inherited Attributes and Methods:
     No public attributes or methods.
 
 Type: <class '__main__.A'>
-ID: 2377993109024
+ID: 1844309605920
 
 Documentation (Docstrings):
   No documentation available.
 
 Special Methods and Properties:
-  __class__
-  __delattr__
-  __dict__
-  __dir__
-  __doc__
-  __eq__
-  __format__
-  __ge__
-  __getattribute__
-  __gt__
-  __hash__
-  __init__
-  __init_subclass__
-  __le__
-  __lt__
-  __module__
-  __ne__
-  __new__
-  __reduce__
-  __reduce_ex__
-  __repr__
-  __setattr__
-  __sizeof__
-  __str__
-  __subclasshook__
-  __weakref__
+  c||__class__
+  c||__delattr__
+  p||__dict__
+  c||__dir__
+  p||__doc__
+  c||__eq__
+  c||__format__
+  c||__ge__
+  c||__getattribute__
+  c||__gt__
+  c||__hash__
+  c||__init__
+  c||__init_subclass__
+  c||__le__
+  c||__lt__
+  p||__module__
+  c||__ne__
+  c||__new__
+  c||__reduce__
+  c||__reduce_ex__
+  c||__repr__
+  c||__setattr__
+  c||__sizeof__
+  c||__str__
+  c||__subclasshook__
+  p||__weakref__
 
 State:
   Internal state is represented by the instance attributes above.
