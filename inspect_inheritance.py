@@ -18,8 +18,11 @@ def get_class_details(cls):
 
     print(f"Inheritance tree and details for {cls.__name__}:\n")
 
-    for base in cls.__mro__:
-        indent_level = cls.__mro__.index(base)
+    reversed_mro = cls.__mro__[::-1]
+    for base in reversed_mro:
+        if base is object:
+            continue
+        indent_level = len(reversed_mro) - cls.__mro__.index(base) - 2
         indent = "  " * indent_level
         print(f"{indent}=> {base.__name__}:")
 
@@ -49,9 +52,28 @@ def get_class_details(cls):
             except IndentationError:
                 print("-->")
                 pass
+          
+        # Variable not assigned in init
+        method_vars = []
+        for method in methods:
+            try:
+              source = inspect.getsource(getattr(base, method))
+              tree = ast.parse(dedent(source))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Assign):
+                      for target in node.targets:
+                          if isinstance(target, ast.Attribute):
+                              if (isinstance(target.value, ast.Name) and target.value.id == 'self'):
+                                  method_vars.append(target.attr)
+            except (OSError, TypeError):
+                pass  # Source code not available
+            except IndentationError:
+                print("-->")
+                pass
 
         # Remove duplicates
         init_vars = list(set(init_vars))
+        method_vars = list(set(method_vars))
 
         # Print methods
         if methods:
@@ -71,6 +93,12 @@ def get_class_details(cls):
             for var in init_vars:
                 print(f"{indent}    {var}")
 
+        # Print variables not assigned in __init__
+        if method_vars:
+            print(f"{indent}  Variables not assigned in __init__:")
+            for var in method_vars:
+                print(f"{indent}    {var}")
+
         print("")  # Empty line for separation
 
 # Example usage
@@ -81,7 +109,7 @@ class A:
         self.instance_var_A = 'A'
 
     def method_a(self):
-        pass
+        self.instance_var_a = 'a'
 
 class B(A):
     class_var_B = 2
@@ -91,7 +119,7 @@ class B(A):
         self.instance_var_B = 'B'
 
     def method_b(self):
-        pass
+        self.instance_var_b = 'b'
 
 class C(B):
     class_var_C = 3
@@ -101,22 +129,21 @@ class C(B):
         self.instance_var_C = 'C'
 
     def method_c(self):
-        pass
+        self.instance_var_c = 'c'
 
 get_class_details(C)
 
-"""
-Inheritance tree and details for C:
+"""Inheritance tree and details for C:
 
-=> C:
+=> A:
   Methods:
     method_a
-    method_b
-    method_c
   Class Variables:
-    class_var_C
+    class_var_A
   Variables assigned in __init__:
-    instance_var_C
+    instance_var_A
+  Variables not assigned in __init__:
+    instance_var_a
 
   => B:
     Methods:
@@ -126,14 +153,22 @@ Inheritance tree and details for C:
       class_var_B
     Variables assigned in __init__:
       instance_var_B
+    Variables not assigned in __init__:
+      instance_var_a
+      instance_var_b
 
-    => A:
+    => C:
       Methods:
         method_a
+        method_b
+        method_c
       Class Variables:
-        class_var_A
+        class_var_C
       Variables assigned in __init__:
-        instance_var_A
+        instance_var_C
+      Variables not assigned in __init__:
+        instance_var_a
+        instance_var_b
+        instance_var_c
 
-      => object:
 """
