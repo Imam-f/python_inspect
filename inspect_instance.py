@@ -1,3 +1,6 @@
+import pprint
+import pickle
+
 def inspect_object(obj):
     print(f"Instance of: {obj.__class__}\n")
     
@@ -6,7 +9,8 @@ def inspect_object(obj):
     attributes = vars(obj)
     if attributes:
         for attr, value in attributes.items():
-            print(f"  {attr} = {value}")
+            print(f"  {attr} = \t", end="")
+            pprint.pprint(value)
     else:
         print("  No instance attributes.")
     print()
@@ -78,8 +82,11 @@ class A:
         self.x = x
         self.y = y
 
-print("A:")
-print(inspect_object(A(1, 2)))
+if __name__ == "__main__":
+    print("A:")
+    a = A(1, ([2, 3], {"4": (6.7)}))
+    inspect_object(a)
+    pickle.dump(a, open("a.pkl", "wb"))
 
 """
 A:
