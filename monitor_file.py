@@ -101,7 +101,8 @@ if __name__ == "__main__":
         "*.tmp",        # Ignore temporary files
         "*.pyc",        # Ignore Python compiled files
         ".git/*",       # Ignore git directory
-        "__pycache__/*" # Ignore Python cache directory
+        "__pycache__/*", # Ignore Python cache directory
+        "*.log",        # Ignore log files
     ]
     
     start_monitoring(
