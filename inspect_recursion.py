@@ -235,6 +235,7 @@ def transform_tail_recursive_function(func):
     transformed_tree = transformer.visit(tree)
     ast.fix_missing_locations(transformed_tree)
     
+    print("transformed_tree:\n", ast.unparse(transformed_tree))
     code_obj = compile(transformed_tree, filename="<ast>", mode="exec")
     
     namespace = {}
@@ -276,3 +277,4 @@ if __name__ == "__main__":
 
     # This loop-based approach won't hit recursion limit for large n
     print("iter_factorial(1000) works without recursion error!")
+    print(f"{iter_factorial(1005)=}")
