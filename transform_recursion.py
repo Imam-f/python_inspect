@@ -6,147 +6,185 @@ import types
 class TailRecursionTransformer(ast.NodeTransformer):
     """
     This AST transformer can handle *either* a top-level 'if' statement
-    OR a top-level 'match' statement with exactly one tail call case.
+    OR a top-level 'match' statement with a single fallback case that
+    does the tail call.
     
-    Pattern handled (conceptually):
+    Pattern handled:
+    
+    def func(...):
+        match <expr>:
+            case <pattern1>:
+                return <base_expr1>
+            case <pattern2>:
+                return <base_expr2>
+            ...
+            case _:
+                return func(<updated_args>)
+                
+    OR
     
     def func(...):
         if <condition>:
             return <base_expr>
         return func(<updated_args>)
-
-    OR
-
-    def func(...):
-        match <expr>:
-            case <pattern1>:
-                return <base_expr1>
-            ...
-            case _:
-                return func(<updated_args>)
     """
-
+    
     def __init__(self, func_name):
         super().__init__()
         self.func_name = func_name
 
     def visit_FunctionDef(self, node):
         if node.name != self.func_name:
-            return node  # Only transform the targeted function
+            return node  # only transform the function we're targeting
+        
+        # We expect exactly one top-level statement that is either:
+        #   1) an if-statement with a single return in body, and a single tail-call return afterwards
+        #   2) or a match-statement with multiple 'case' arms, exactly one of which does the tail call
+        #
+        # Then the function must have a 'return func(...)' tail call somewhere.
+        #
+        # For demonstration, let's allow the function body to have either:
+        #   1) two statements (the if + return pattern)
+        #   2) a single match statement
+        #
+        # We transform them into a single `while True:` that replicates the logic.
 
-        # Try transforming an if-based tail recursion first
         new_body = self._maybe_transform_if_tail_recursion(node)
         if new_body is not None:
             node.body = new_body
             return node
-
-        # Otherwise, try transforming a match-based tail recursion
+        
         new_body = self._maybe_transform_match_tail_recursion(node)
         if new_body is not None:
             node.body = new_body
             return node
+        
+        return node  # no transformation
 
-        return node  # No transformation applied
-
-    def _maybe_transform_if_tail_recursion(self, funcdef_node):
+    def _maybe_transform_if_tail_recursion(self, node):
         """
-        Look for a 2-statement function body:
-           if <cond>:
-               return <base_expr>
-           return func(<updated_args>)
-        Rewrite it into a `while True:` loop.
+        Attempt to transform a function with the pattern:
+        
+            if <condition>:
+                return <base_expr>
+            return func(<updated_args>)
+            
+        into:
+        
+            while True:
+                if <condition>:
+                    return <base_expr>
+                # reassign ...
         """
-        if len(funcdef_node.body) != 2:
+        if len(node.body) != 3:
             return None
         
-        if_stmt = funcdef_node.body[0]
-        return_stmt = funcdef_node.body[1]
-
-        # Check for the pattern: top-level if + tail-call return
+        if_stmt = node.body[1]
+        return_stmt = node.body[2]
+        
         if not (isinstance(if_stmt, ast.If) and isinstance(return_stmt, ast.Return)):
             return None
-
-        # The if-stmt body must be a single return
+        
+        # Check if the if-statement has exactly one return statement in its body
         if len(if_stmt.body) != 1 or not isinstance(if_stmt.body[0], ast.Return):
             return None
         if if_stmt.orelse:
-            # We only handle if with no else / elif
+            # We only handle if with no else
             return None
-
-        # The second statement must be a tail call: return <func>(...)
+        
+        # Check if the second statement is a tail call to the same function
         if not isinstance(return_stmt.value, ast.Call):
             return None
         call_node = return_stmt.value
         if not (isinstance(call_node.func, ast.Name) and call_node.func.id == self.func_name):
             return None
-
-        # Everything checks out; build the loop
+        
+        # If we've gotten here, we have the pattern we're looking for.
         condition_check = ast.If(
             test=if_stmt.test,
-            body=[if_stmt.body[0]],  # The 'return base_expr'
+            body=[if_stmt.body[0]],
             orelse=[]
         )
-
-        assignment = self._make_assignment_from_call(funcdef_node, call_node)
+        
+        assignment = self._make_assignment_from_call(node, call_node)
         if assignment is None:
             return None
-
+        
         while_node = ast.While(
-            test=ast.Constant(value=True),  # `while True:`
+            test=ast.Constant(value=True),
             body=[condition_check, assignment],
             orelse=[]
         )
-
         return [while_node]
 
-    def _maybe_transform_match_tail_recursion(self, funcdef_node):
+    def _maybe_transform_match_tail_recursion(self, node):
         """
-        Look for a 1-statement function body:
+        Attempt to transform a function with a single top-level match statement, e.g.
+        
             match <expr>:
                 case <pattern1>:
                     return <base_expr1>
+                case <pattern2>:
+                    return <base_expr2>
                 ...
                 case _:
                     return func(<updated_args>)
-        Rewrite it into a `while True:` loop.
+                    
+        We'll convert it to:
+        
+            while True:
+                match <expr>:
+                    case <pattern1>:
+                        return <base_expr1>
+                    case <pattern2>:
+                        return <base_expr2>
+                    ...
+                    case _:
+                        # reassign ...
         """
-        if len(funcdef_node.body) != 1:
+        if len(node.body) != 2:
             return None
         
-        match_stmt = funcdef_node.body[0]
+        match_stmt = node.body[1]
         if not isinstance(match_stmt, ast.Match):
             return None
-
-        # We expect exactly one case whose body does a tail call to the same function.
+        
+        # We expect exactly one case whose body is a tail call, and one or more that are base-case returns
+        # We'll parse the match statement to see if it fits the pattern
         tail_call_case_idx = -1
-        for i, match_case in enumerate(match_stmt.cases):
+        for idx, match_case in enumerate(match_stmt.cases):
             if len(match_case.body) == 1 and isinstance(match_case.body[0], ast.Return):
-                maybe_call = match_case.body[0].value
-                if (isinstance(maybe_call, ast.Call)
-                    and isinstance(maybe_call.func, ast.Name)
-                    and maybe_call.func.id == self.func_name):
-                    # Found the tail call
+                ret = match_case.body[0].value
+                if isinstance(ret, ast.Call) and isinstance(ret.func, ast.Name) and ret.func.id == self.func_name:
+                    # found the tail call
                     if tail_call_case_idx != -1:
-                        # Multiple tail calls not supported in this simplistic approach
+                        # multiple tail calls not supported
                         return None
-                    tail_call_case_idx = i
+                    tail_call_case_idx = idx
         
         if tail_call_case_idx == -1:
-            # No tail call found
+            # no tail call found
             return None
-
-        # We'll transform the tail-call case into assignment of updated args
+        
+        # Construct a new 'while True:' containing a single match block.
+        # Inside that match block, all cases remain the same *except* the tail call case
+        # is replaced with an assignment statement (param re-bind).
+        
+        # We'll figure out the function's parameter names:
+        param_names = [arg.arg for arg in node.args.args]
+        
+        # The tail call case (match_stmt.cases[tail_call_case_idx]) calls the function with updated arguments
         tail_call_case = match_stmt.cases[tail_call_case_idx]
-        return_stmt = tail_call_case.body[0]
+        return_stmt = tail_call_case.body[0]  # the Return node
         call_node = return_stmt.value
-        assignment = self._make_assignment_from_call(funcdef_node, call_node)
+        assignment = self._make_assignment_from_call(node, call_node)
         if assignment is None:
             return None
-
+        
         # Replace the tail call return with that assignment
         tail_call_case.body = [assignment]
-
-        # Wrap the entire match statement in `while True:`
+        
+        # Wrap this entire match in `while True: match <expr>:` ...
         while_node = ast.While(
             test=ast.Constant(value=True),
             body=[match_stmt],
@@ -156,29 +194,30 @@ class TailRecursionTransformer(ast.NodeTransformer):
 
     def _make_assignment_from_call(self, funcdef_node, call_node):
         """
-        Build an ast.Assign that reassigns the function's parameters from the call arguments.
+        Build an ast.Assign that reassigns the function parameters from the call arguments.
+        If the call has mismatch of param count, return None.
         
-        For example: 
-          return func(n-1, acc*n)
-        becomes:
-          n, acc = (n-1), (acc*n)
+        For example, if the tail call is:
+            return func_name(n-1, acc*n)
+            
+        we build an assignment:
+            n, acc = (n-1), (acc*n)
         """
         param_names = [arg.arg for arg in funcdef_node.args.args]
         if len(call_node.args) != len(param_names):
-            return None  # Mismatched parameter count
-
+            return None
+        
         target_list = []
         value_list = []
         for pname, arg in zip(param_names, call_node.args):
             target_list.append(ast.Name(id=pname, ctx=ast.Store()))
             value_list.append(arg)
-
+        
         assignment = ast.Assign(
             targets=[ast.Tuple(elts=target_list, ctx=ast.Store())],
             value=ast.Tuple(elts=value_list, ctx=ast.Load())
         )
         return assignment
-
 
 def tail_recursive(func):
     """
@@ -202,18 +241,16 @@ def tail_recursive(func):
                 return acc
             return factorial(n - 1, acc * n)
     """
-    print("first")
     source = inspect.getsource(func)
     # dedent in case the function is indented (e.g. in a class or nested function)
-    source = textwrap.dedent(source)
-    
-    print("parsing")
+    # print(*source)
+    source = "\n".join(str(textwrap.dedent(source)).split("\n")[1:])
+
     tree = ast.parse(source)
     transformer = TailRecursionTransformer(func.__name__)
     transformed_tree = transformer.visit(tree)
     ast.fix_missing_locations(transformed_tree)
     
-    print("before compile")
     code_obj = compile(transformed_tree, filename="<ast>", mode="exec")
 
     # We'll run the code in the original function's globals, so it can reference the same environment
@@ -226,7 +263,6 @@ def tail_recursive(func):
     new_func.__name__ = func.__name__
     
     return new_func
-
 
 # Example 1: match-based tail-recursive factorial
 @tail_recursive
@@ -251,7 +287,6 @@ def factorial_if(n, acc=1):
 # -----------------------------
 if __name__ == "__main__":
     print("factorial_match(5) =", factorial_match(5))  # 120
-
     print("factorial_if(5) =", factorial_if(5))  # 120
 
     # Check large input doesn't cause recursion error

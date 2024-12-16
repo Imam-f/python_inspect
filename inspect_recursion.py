@@ -58,7 +58,7 @@ class TailRecursionTransformer(ast.NodeTransformer):
         if new_body is not None:
             node.body = new_body
             return node
-
+        
         return node  # no transformation
 
     def _maybe_transform_if_tail_recursion(self, node):
@@ -76,11 +76,11 @@ class TailRecursionTransformer(ast.NodeTransformer):
                     return <base_expr>
                 # reassign ...
         """
-        if len(node.body) != 2:
+        if len(node.body) != 3:
             return None
         
-        if_stmt = node.body[0]
-        return_stmt = node.body[1]
+        if_stmt = node.body[1]
+        return_stmt = node.body[2]
         
         if not (isinstance(if_stmt, ast.If) and isinstance(return_stmt, ast.Return)):
             return None
@@ -142,10 +142,10 @@ class TailRecursionTransformer(ast.NodeTransformer):
                     case _:
                         # reassign ...
         """
-        if len(node.body) != 1:
+        if len(node.body) != 2:
             return None
         
-        match_stmt = node.body[0]
+        match_stmt = node.body[1]
         if not isinstance(match_stmt, ast.Match):
             return None
         
