@@ -1,4 +1,10 @@
 # Example usage
+b = 1
+
+def setb(x):
+    global b
+    b = x
+
 class A:
     class_var_A = 1
 
