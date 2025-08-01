@@ -83,6 +83,13 @@ class A:
         self.x = x
         self.y = y
 
+class B(A):
+    def print_y(self):
+        print(self.y)
+        
+    def set_x(self, x):
+        self.x = x
+
 def hello(x):
     data = x
     for i in range(10):
@@ -98,6 +105,8 @@ if __name__ == "__main__":
     value = next(gen)
     inspect_object(gen)
     pickle.dump(a, open("a.pkl", "wb"))
+    pickle.dump(A, open("Aclass.pkl", "wb"))
+    pickle.dump(B, open("Bclass.pkl", "wb"))
 
 """
 A:
